@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCM | Painel de Inteligência Operacional</title>
+
+<!-- Bootstrap 5 -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<!-- Bootstrap Icons -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<!-- Google Fonts: Barlow Condensed (display / numerals) + Inter (body) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B2342">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+
+<!-- ============ TOPBAR ============ -->
+<header class="gcm-topbar">
+  <div class="gcm-topbar-brand">
+    <div class="gcm-brand-badge"><i class="bi bi-shield-shaded"></i></div>
+    <div>
+      <div class="gcm-brand-title">Guarda Civil Municipal</div>
+      <div class="gcm-brand-sub">Painel de Inteligência Operacional &middot; Ano-base <span id="anoBase">—</span></div>
+    </div>
+  </div>
+
+  <div class="gcm-topbar-actions">
+    <span class="gcm-clock" id="relogio">--:--:--</span>
+
+    <button class="btn gcm-btn-ghost" id="btnGerenciar" data-bs-toggle="modal" data-bs-target="#modalGerenciar">
+      <i class="bi bi-folder2-open"></i> Planilhas <span class="badge gcm-badge-count" id="qtdArquivosBadge">0</span>
+    </button>
+
+    <div class="dropdown">
+      <button class="btn gcm-btn-ghost dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-download"></i> Exportar
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end gcm-dropdown">
+        <li><a class="dropdown-item" href="#" id="expDashPdf"><i class="bi bi-file-earmark-pdf"></i> Dashboard completo (PDF)</a></li>
+        <li><a class="dropdown-item" href="#" id="expExecPdf"><i class="bi bi-file-earmark-text"></i> Relatório executivo (PDF)</a></li>
+        <li><a class="dropdown-item" href="#" id="expExcel"><i class="bi bi-file-earmark-excel"></i> Dados filtrados (Excel)</a></li>
+        <li><a class="dropdown-item" href="#" id="expCsv"><i class="bi bi-filetype-csv"></i> Dados filtrados (CSV)</a></li>
+        <li><a class="dropdown-item" href="#" id="expGraficosPng"><i class="bi bi-images"></i> Todos os gráficos (PNG)</a></li>
+      </ul>
+    </div>
+
+    <button class="btn gcm-btn-primary" data-bs-toggle="modal" data-bs-target="#modalImportar">
+      <i class="bi bi-cloud-arrow-up"></i> Adicionar Planilhas
+    </button>
+  </div>
+</header>
+
+<div id="avisoLibsGlobal" class="alert alert-danger rounded-0 mb-0 d-none text-center py-2">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+  Algumas bibliotecas necessárias não carregaram corretamente (verifique sua conexão com a internet). Recarregue a página; se o problema persistir, o acesso a <code>cdnjs.cloudflare.com</code> pode estar bloqueado nesta rede.
+</div>
+
+<!-- ============ FILTER BAR ============ -->
+<div class="gcm-filterbar" id="filterBar">
+  <div class="gcm-filter-group">
+    <label><i class="bi bi-people-fill"></i> Equipe</label>
+    <select id="fEquipe" class="form-select form-select-sm">
+      <option value="Todas">Todas</option>
+      <option value="Alpha">Alpha</option>
+      <option value="Bravo">Bravo</option>
+      <option value="Delta">Delta</option>
+    </select>
+  </div>
+
+  <div class="gcm-filter-group gcm-filter-wide">
+    <label><i class="bi bi-calendar3"></i> Competência</label>
+    <div class="dropdown gcm-multiselect" id="fMesesDropdown">
+      <button class="form-select form-select-sm text-start" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+        <span id="fMesesLabel">Todos os meses</span>
+      </button>
+      <ul class="dropdown-menu p-2 gcm-meses-menu" id="fMesesList"></ul>
+    </div>
+  </div>
+
+  <div class="gcm-filter-group">
+    <label><i class="bi bi-calendar-event"></i> Data inicial</label>
+    <input type="date" id="fDataIni" class="form-control form-control-sm">
+  </div>
+
+  <div class="gcm-filter-group">
+    <label><i class="bi bi-calendar-check"></i> Data final</label>
+    <input type="date" id="fDataFim" class="form-control form-control-sm">
+  </div>
+
+  <div class="gcm-filter-group">
+    <label><i class="bi bi-signpost-split"></i> Bairro</label>
+    <select id="fBairro" class="form-select form-select-sm"><option value="Todos">Todos</option></select>
+  </div>
+
+  <div class="gcm-filter-group">
+    <label><i class="bi bi-tags"></i> Natureza</label>
+    <select id="fNatureza" class="form-select form-select-sm"><option value="Todos">Todos</option></select>
+  </div>
+
+  <div class="gcm-filter-group">
+    <label><i class="bi bi-truck-front"></i> Viatura</label>
+    <select id="fViatura" class="form-select form-select-sm"><option value="Todos">Todos</option></select>
+  </div>
+
+  <button class="btn gcm-btn-clear" id="btnLimparFiltros" title="Limpar filtros">
+    <i class="bi bi-x-circle"></i> Limpar
+  </button>
+</div>
+
+<main class="gcm-main" id="capturaDashboard">
+
+  <!-- Empty state -->
+  <div id="emptyState" class="gcm-empty d-none">
+    <i class="bi bi-inboxes"></i>
+    <h2>Nenhuma planilha carregada</h2>
+    <p>Adicione até 15 planilhas mensais (.xlsx ou .csv) para iniciar a análise operacional.</p>
+    <button class="btn gcm-btn-primary" data-bs-toggle="modal" data-bs-target="#modalImportar">
+      <i class="bi bi-cloud-arrow-up"></i> Adicionar Planilhas
+    </button>
+  </div>
+
+  <div id="dashboardContent" class="d-none">
+
+    <!-- ============ KPI CARDS ============ -->
+    <section class="gcm-kpi-row">
+      <div class="gcm-kpi-card gcm-kpi-blue">
+        <div class="gcm-kpi-icon"><i class="bi bi-journal-text"></i></div>
+        <div class="gcm-kpi-body">
+          <div class="gcm-kpi-value" data-counter="0" id="kpiOcorrencias">0</div>
+          <div class="gcm-kpi-label">Ocorrências Registradas</div>
+        </div>
+      </div>
+      <div class="gcm-kpi-card gcm-kpi-navy">
+        <div class="gcm-kpi-icon"><i class="bi bi-geo-alt-fill"></i></div>
+        <div class="gcm-kpi-body">
+          <div class="gcm-kpi-value" data-counter="0" id="kpiRondas">0</div>
+          <div class="gcm-kpi-label">Rondas Preventivas</div>
+        </div>
+      </div>
+      <div class="gcm-kpi-card gcm-kpi-slate">
+        <div class="gcm-kpi-icon"><i class="bi bi-speedometer2"></i></div>
+        <div class="gcm-kpi-body">
+          <div class="gcm-kpi-value" data-counter="0" id="kpiKm">0</div>
+          <div class="gcm-kpi-label">KM Rodado</div>
+        </div>
+      </div>
+      <div class="gcm-kpi-card gcm-kpi-red">
+        <div class="gcm-kpi-icon"><i class="bi bi-box-seam"></i></div>
+        <div class="gcm-kpi-body">
+          <div class="gcm-kpi-value" data-counter="0" id="kpiApreensoes">0</div>
+          <div class="gcm-kpi-label">Apreensões</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CHARTS GRID ============ -->
+    <section class="gcm-panel">
+      <div class="gcm-panel-head"><i class="bi bi-bar-chart-line"></i> Ocorrências</div>
+      <div class="gcm-chart-grid">
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">Ocorrências por Natureza</div>
+          <div class="gcm-chart-wrap gcm-chart-tall"><canvas id="chartNatureza"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">Distribuição por Bairro</div>
+          <div class="gcm-chart-wrap gcm-chart-tall"><canvas id="chartBairroBubble"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">Ocorrências por Código do Catálogo</div>
+          <div class="gcm-chart-wrap"><canvas id="chartCodigo"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">Top 10 Bairros</div>
+          <div class="gcm-chart-wrap"><canvas id="chartTop10Bairros"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-12">
+          <div class="gcm-chart-title">Evolução Mensal das Ocorrências</div>
+          <div class="gcm-chart-wrap"><canvas id="chartEvolOcorrencias"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="gcm-panel">
+      <div class="gcm-panel-head"><i class="bi bi-shield-check"></i> Rondas &amp; Viaturas</div>
+      <div class="gcm-chart-grid">
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">Evolução Mensal das Rondas</div>
+          <div class="gcm-chart-wrap"><canvas id="chartEvolRondas"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">Rondas por Equipe</div>
+          <div class="gcm-chart-wrap"><canvas id="chartRondasEquipe"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">KM Rodado por Viatura</div>
+          <div class="gcm-chart-wrap"><canvas id="chartKmViatura"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-6">
+          <div class="gcm-chart-title">Evolução do KM Rodado</div>
+          <div class="gcm-chart-wrap"><canvas id="chartEvolKm"></canvas></div>
+        </div>
+        <div class="gcm-chart-card gcm-span-12">
+          <div class="gcm-chart-title">Evolução das Apreensões</div>
+          <div class="gcm-chart-wrap"><canvas id="chartEvolApreensoes"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ INTELIGÊNCIA OPERACIONAL ============ -->
+    <section class="gcm-panel">
+      <div class="gcm-panel-head"><i class="bi bi-lightbulb"></i> Inteligência Operacional</div>
+      <div class="gcm-intel-grid" id="intelGrid"></div>
+    </section>
+
+    <!-- ============ TABELA ============ -->
+    <section class="gcm-panel" id="tabelaPanel">
+      <div class="gcm-panel-head"><i class="bi bi-table"></i> Registro Detalhado de Ocorrências</div>
+
+      <div class="gcm-table-toolbar">
+        <div class="gcm-table-search">
+          <i class="bi bi-search"></i>
+          <input type="text" id="tabelaBusca" class="form-control form-control-sm" placeholder="Pesquisar em qualquer coluna…">
+        </div>
+        <div class="gcm-table-toolbar-actions">
+          <button class="btn btn-sm gcm-btn-table" id="btnTabelaExcel"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+          <button class="btn btn-sm gcm-btn-table" id="btnTabelaCsv"><i class="bi bi-filetype-csv"></i> CSV</button>
+          <button class="btn btn-sm gcm-btn-table" id="btnTabelaPdf"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+          <button class="btn btn-sm gcm-btn-table" id="btnTabelaImprimir"><i class="bi bi-printer"></i> Imprimir</button>
+        </div>
+      </div>
+
+      <div class="table-responsive gcm-table-wrap">
+        <table id="tabelaOcorrencias" class="table table-hover w-100">
+          <thead>
+            <tr>
+              <th data-field="_date">Data <i class="bi bi-arrow-down-up"></i></th>
+              <th data-field="Equipe">Equipe <i class="bi bi-arrow-down-up"></i></th>
+              <th data-field="N_AO">N° AO <i class="bi bi-arrow-down-up"></i></th>
+              <th data-field="Codigo_Catalogo">Código <i class="bi bi-arrow-down-up"></i></th>
+              <th data-field="Natureza">Natureza <i class="bi bi-arrow-down-up"></i></th>
+              <th data-field="Bairro">Bairro <i class="bi bi-arrow-down-up"></i></th>
+              <th data-field="Descricao_Ocorrencia">Descrição <i class="bi bi-arrow-down-up"></i></th>
+            </tr>
+          </thead>
+          <tbody id="tabelaBody"></tbody>
+        </table>
+      </div>
+
+      <div class="gcm-table-footer">
+        <div class="gcm-table-info" id="tabelaInfo">—</div>
+        <div class="gcm-table-pageSize">
+          <label for="tabelaPageSize">Exibir</label>
+          <select id="tabelaPageSize" class="form-select form-select-sm">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          <span>registros</span>
+        </div>
+        <div class="gcm-table-pagination" id="tabelaPaginacao"></div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ============ MODAL: IMPORTAR ============ -->
+<div class="modal fade" id="modalImportar" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content gcm-modal">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cloud-arrow-up"></i> Adicionar Planilhas</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="avisoLibsModal" class="alert alert-danger d-none mb-3">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          Uma ou mais bibliotecas necessárias não carregaram (conexão com a internet instável ou bloqueio de firewall a <code>cdnjs.cloudflare.com</code>). O upload não vai funcionar até isso ser corrigido.
+        </div>
+        <div class="gcm-dropzone" id="dropzone">
+          <i class="bi bi-file-earmark-spreadsheet"></i>
+          <p>Arraste até 15 arquivos .xlsx ou .csv aqui, ou clique para selecionar</p>
+          <small>Cada planilha deve conter as abas: Página1 (Ocorrências), Página2 (Rondas), Página3 (Viaturas) e Página4 (Apreensões).</small>
+          <input type="file" id="inputArquivos" accept=".xlsx,.xls,.csv" multiple hidden>
+        </div>
+        <div id="listaImportacao" class="gcm-import-list"></div>
+      </div>
+      <div class="modal-footer">
+        <span class="text-muted small me-auto" id="statusImportacao"></span>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+        <button class="btn gcm-btn-primary d-none" id="btnConcluirImportacao">
+          <i class="bi bi-check-circle"></i> Concluir e ver painel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: GERENCIAR ============ -->
+<div class="modal fade" id="modalGerenciar" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content gcm-modal">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-folder2-open"></i> Gerenciamento das Planilhas</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table gcm-manage-table align-middle">
+            <thead>
+              <tr>
+                <th>Arquivo</th><th>Mês identificado</th><th>Ocorrências</th><th>Rondas</th><th>KM Rodado</th><th>Apreensões</th><th class="text-end">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyGerenciar"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalImportar" data-bs-dismiss="modal">
+          <i class="bi bi-plus-circle"></i> Adicionar nova planilha
+        </button>
+        <button class="btn btn-outline-danger" id="btnLimparTudo"><i class="bi bi-trash3"></i> Limpar Todos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer"></div>
+
+<!-- ============ SCRIPTS (todos via cdnjs.cloudflare.com) ============ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script src="script.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => {
+        console.warn('Falha ao registrar service worker (app continua funcionando online):', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
