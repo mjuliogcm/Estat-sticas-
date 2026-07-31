@@ -36,7 +36,7 @@
 <!-- ============ TOPBAR ============ -->
 <header class="gcm-topbar">
   <div class="gcm-topbar-brand">
-    <div class="gcm-brand-badge"><i class="bi bi-shield-shaded"></i></div>
+    <div class="gcm-brand-badge"><img src="brasao.png" alt="Brasão da Guarda Civil Municipal de Matão"></div>
     <div>
       <div class="gcm-brand-title">Guarda Civil Municipal</div>
       <div class="gcm-brand-sub">Painel de Inteligência Operacional &middot; Ano-base <span id="anoBase">—</span></div>
@@ -56,7 +56,7 @@
       </button>
       <ul class="dropdown-menu dropdown-menu-end gcm-dropdown">
         <li><a class="dropdown-item" href="#" id="expDashPdf"><i class="bi bi-file-earmark-pdf"></i> Dashboard completo (PDF)</a></li>
-        <li><a class="dropdown-item" href="#" id="expExecPdf"><i class="bi bi-file-earmark-text"></i> Relatório executivo (PDF)</a></li>
+        <li><a class="dropdown-item" href="#" id="expExecDocx"><i class="bi bi-file-earmark-word"></i> Relatório executivo (Word)</a></li>
         <li><a class="dropdown-item" href="#" id="expExcel"><i class="bi bi-file-earmark-excel"></i> Dados filtrados (Excel)</a></li>
         <li><a class="dropdown-item" href="#" id="expCsv"><i class="bi bi-filetype-csv"></i> Dados filtrados (CSV)</a></li>
         <li><a class="dropdown-item" href="#" id="expGraficosPng"><i class="bi bi-images"></i> Todos os gráficos (PNG)</a></li>
@@ -198,23 +198,41 @@
       <div class="gcm-panel-head"><i class="bi bi-bar-chart-line"></i> Ocorrências</div>
       <div class="gcm-chart-grid">
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">Ocorrências por Natureza</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Ocorrências por Natureza</div>
+            <button class="gcm-chart-dl" data-chart-id="chartNatureza" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap gcm-chart-tall"><canvas id="chartNatureza"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">Distribuição por Bairro</div>
-          <div class="gcm-chart-wrap gcm-chart-tall"><canvas id="chartBairroBubble"></canvas></div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Distribuição por Bairro</div>
+            <button class="gcm-chart-dl" data-chart-id="chartBairroDonut" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
+          <div class="gcm-chart-wrap gcm-chart-tall gcm-donut-wrap">
+            <div class="gcm-donut-canvas"><canvas id="chartBairroDonut"></canvas></div>
+            <div id="bairroDonutLegend" class="gcm-donut-legend"></div>
+          </div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">Ocorrências por Código do Catálogo</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Ocorrências por Código do Catálogo (por categoria)</div>
+            <button class="gcm-chart-dl" data-chart-id="chartCodigo" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartCodigo"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">Top 10 Bairros</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Top 10 Bairros</div>
+            <button class="gcm-chart-dl" data-chart-id="chartTop10Bairros" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartTop10Bairros"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-12">
-          <div class="gcm-chart-title">Evolução Mensal das Ocorrências</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Evolução Mensal das Ocorrências</div>
+            <button class="gcm-chart-dl" data-chart-id="chartEvolOcorrencias" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartEvolOcorrencias"></canvas></div>
         </div>
       </div>
@@ -224,23 +242,38 @@
       <div class="gcm-panel-head"><i class="bi bi-shield-check"></i> Rondas &amp; Viaturas</div>
       <div class="gcm-chart-grid">
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">Evolução Mensal das Rondas</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Evolução Mensal das Rondas</div>
+            <button class="gcm-chart-dl" data-chart-id="chartEvolRondas" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartEvolRondas"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">Rondas por Equipe</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Rondas por Equipe</div>
+            <button class="gcm-chart-dl" data-chart-id="chartRondasEquipe" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartRondasEquipe"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">KM Rodado por Viatura</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">KM Rodado por Viatura</div>
+            <button class="gcm-chart-dl" data-chart-id="chartKmViatura" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartKmViatura"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
-          <div class="gcm-chart-title">Evolução do KM Rodado</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Evolução do KM Rodado</div>
+            <button class="gcm-chart-dl" data-chart-id="chartEvolKm" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartEvolKm"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-12">
-          <div class="gcm-chart-title">Evolução das Apreensões</div>
+          <div class="gcm-chart-title-row">
+            <div class="gcm-chart-title">Evolução das Apreensões</div>
+            <button class="gcm-chart-dl" data-chart-id="chartEvolApreensoes" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
+          </div>
           <div class="gcm-chart-wrap"><canvas id="chartEvolApreensoes"></canvas></div>
         </div>
       </div>
@@ -397,7 +430,8 @@
     ['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'],
     ['https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'],
     ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'],
-    ['https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js']
+    ['https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'],
+    ['https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js', 'https://unpkg.com/docx@8.5.0/build/index.umd.min.js']
   ];
 
   // Carrega cada biblioteca em sequência (mantendo a ordem original) e só então carrega script.js.

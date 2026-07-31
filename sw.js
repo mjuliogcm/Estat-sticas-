@@ -5,7 +5,7 @@
    Depois do primeiro carregamento com internet, o painel abre normalmente offline.
    ========================================================================== */
 
-const CACHE_VERSION = 'gcm-painel-v1';
+const CACHE_VERSION = 'gcm-painel-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,7 +13,8 @@ const APP_SHELL = [
   './script.js',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './brasao.png'
 ];
 
 self.addEventListener('install', (event) => {

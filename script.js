@@ -18,6 +18,38 @@
   const EQUIPE_COLORS = { Alpha: '#1565C0', Bravo: '#0B2342', Delta: '#B3261E' };
   const PALETTE = ['#1565C0','#0B2342','#4C8DDA','#B3261E','#0F7B47','#8A5A00','#6D4AA6','#0E7C86','#B0475A','#4B5563'];
 
+  // Categorias de ocorrência conforme a letra inicial do Código do Catálogo
+  const CATALOGO_LETRAS = {
+    A: 'OC. CONTRA PESSOA',
+    B: 'OC. CONTRA PATRIMÔNIO',
+    C: 'OC. CONTRA A PAZ PÚBLICA',
+    D: 'OC. CONTRA OS COSTUMES',
+    E: 'OC. CONTRA A ADM. PÚBLICA',
+    F: 'OC. COM ENTORPECENTE',
+    G: 'OC. COM PRESOS',
+    H: 'OC. DE MANIFESTAÇÃO PÚBLICA',
+    I: 'OC. CONTRA O MEIO AMBIENTE',
+    O: 'OUTRAS OC. ILÍCITOS PENAIS',
+    P: 'OC. DE TRÂNSITO',
+    R: 'OC. DE AUXÍLIO AO PÚBLICO',
+    S: 'OC. DE BOMBEIRO',
+    T: 'APOIO A INSTITUIÇÃO PÚBLICA',
+    V: 'OUTROS ATENDIMENTOS',
+    X: 'VIOLÊNCIA DOMÉSTICA'
+  };
+
+  function letraDoCodigo(codigo){
+    const s = String(codigo || '').trim();
+    const m = s.match(/[A-Za-z]/);
+    return m ? m[0].toUpperCase() : '';
+  }
+
+  function categoriaDoCodigo(codigo){
+    const letra = letraDoCodigo(codigo);
+    const nome = CATALOGO_LETRAS[letra] || (letra ? `OUTROS (${letra})` : 'NÃO IDENTIFICADO');
+    return { letra, nome, label: letra ? `${letra} — ${nome}` : nome };
+  }
+
   /* ---------------------------------------------------------------------
      1. ESTADO GLOBAL
   --------------------------------------------------------------------- */
@@ -578,22 +610,31 @@
       plugins: [barValueLabel]
     });
 
-    // 2. Distribuição por Bairro — Bubble chart (bairro x quantidade)
+    // 2. Distribuição por Bairro — Donut (proporção por bairro) + legenda com percentuais
     const bMap = sortDesc(groupCount(oc, 'Bairro'));
-    upsertChart('chartBairroBubble', {
-      type: 'bubble',
-      data: { datasets: bMap.slice(0,15).map((e,i) => ({
-        label: e[0],
-        data: [{ x: i, y: e[1], r: Math.max(6, Math.sqrt(e[1])*4) }],
-        backgroundColor: PALETTE[i % PALETTE.length] + 'CC'
-      })) },
+    const bTotal = bMap.reduce((s,e)=>s+e[1],0) || 1;
+    upsertChart('chartBairroDonut', {
+      type: 'doughnut',
+      data: { labels: bMap.map(e=>e[0]), datasets: [{
+        data: bMap.map(e=>e[1]),
+        backgroundColor: bMap.map((e,i)=>PALETTE[i % PALETTE.length]),
+        borderColor: '#fff', borderWidth: 2
+      }] },
       options: {
-        responsive:true, maintainAspectRatio:false,
+        responsive:true, maintainAspectRatio:false, cutout:'55%',
         plugins:{ legend:{ display:false }, tooltip:{ callbacks:{
-          label: (c) => `${c.dataset.label}: ${fmtInt(c.raw.y)} ocorrências` } } },
-        scales:{ x:{ display:false }, y:{ beginAtZero:true, grid:{ color:'#EEF1F5' } } }
+          label: (c) => `${c.label}: ${fmtInt(c.raw)} (${((c.raw/bTotal)*100).toFixed(1).replace('.',',')}%)` } } }
       }
     });
+    const legendEl = $('#bairroDonutLegend');
+    if (legendEl){
+      legendEl.innerHTML = bMap.map((e,i) => `
+        <div class="gcm-donut-legend-item">
+          <span class="dot" style="background:${PALETTE[i % PALETTE.length]}"></span>
+          <span class="nome">${e[0]}</span>
+          <span class="pct">${fmtInt(e[1])} · ${((e[1]/bTotal)*100).toFixed(0)}%</span>
+        </div>`).join('');
+    }
 
     // 3. Evolução mensal das Rondas — linha
     const roEvMap = {};
@@ -607,13 +648,19 @@
         scales:{ y:{ grid:{color:'#EEF1F5'} }, x:{ grid:{display:false} } } }
     });
 
-    // 4. Ocorrências por Código do Catálogo
-    const codMap = sortDesc(groupCount(oc, 'Codigo_Catalogo'));
+    // 4. Ocorrências por Código do Catálogo — agrupado pela letra inicial (categoria)
+    const catMap = {};
+    oc.forEach(r => {
+      const { label } = categoriaDoCodigo(r.Codigo_Catalogo);
+      catMap[label] = (catMap[label]||0) + 1;
+    });
+    const codMap = sortDesc(catMap);
     upsertChart('chartCodigo', {
       type: 'bar',
       data: { labels: codMap.map(e=>e[0]), datasets: [{ data: codMap.map(e=>e[1]), backgroundColor:'#4C8DDA', borderRadius:4 }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'} }, x:{ grid:{display:false}, ticks:{ maxRotation:45, minRotation:0 } } } }
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label: c => `Quantidade: ${fmtInt(c.raw)}` } } },
+        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'} }, x:{ grid:{display:false}, ticks:{ maxRotation:60, minRotation:30, autoSkip:false, font:{size:9} } } } }
     });
 
     // 5. Top 10 Bairros
@@ -932,17 +979,47 @@
     a.click();
   }
 
+  // Gera um PNG com fundo branco a partir de um gráfico Chart.js (o canvas original é transparente)
+  function chartToWhitePng(chart){
+    const src = chart.canvas;
+    const out = document.createElement('canvas');
+    out.width = src.width;
+    out.height = src.height;
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(src, 0, 0);
+    return out.toDataURL('image/png', 1.0);
+  }
+
+  function exportSingleChartPng(chartId){
+    const chart = state.charts[chartId];
+    if (!chart){ toast('Gráfico ainda não está disponível para exportar.', 'warning'); return; }
+    const a = document.createElement('a');
+    a.href = chartToWhitePng(chart);
+    a.download = `gcm_${chartId}_${Date.now()}.png`;
+    a.click();
+  }
+
   function exportChartsPng(){
     const ids = Object.keys(state.charts);
     if (!ids.length){ toast('Nenhum gráfico disponível para exportar.', 'warning'); return; }
     ids.forEach((id, i) => {
       setTimeout(() => {
-        const chart = state.charts[id];
         const a = document.createElement('a');
-        a.href = chart.toBase64Image();
-        a.download = `${id}.png`;
+        a.href = chartToWhitePng(state.charts[id]);
+        a.download = `gcm_${id}.png`;
         a.click();
       }, i * 250);
+    });
+  }
+
+  function wireChartDownloadButtons(){
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.gcm-chart-dl');
+      if (!btn) return;
+      e.preventDefault();
+      exportSingleChartPng(btn.getAttribute('data-chart-id'));
     });
   }
 
@@ -969,52 +1046,245 @@
     pdf.save(`gcm_dashboard_${Date.now()}.pdf`);
   }
 
-  function exportExecutiveReportPdf(){
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p', 'pt', 'a4');
-    const oc = filtered('ocorrencias'), ro = filtered('rondas'), vi = filtered('viaturas');
-    const ap = filtered('apreensoes').filter(r => String(r.Materiais_Apreendidos||'').trim()!=='');
+  /* ---------- Relatório Executivo (Word / .docx) ---------- */
+  function dataUrlToUint8Array(dataUrl){
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
 
-    pdf.setFontSize(16); pdf.setTextColor('#0B2342');
-    pdf.text('Guarda Civil Municipal — Relatório Executivo', 40, 50);
-    pdf.setFontSize(10); pdf.setTextColor('#475467');
-    pdf.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 40, 68);
+  function chartDocxSize(chartId, maxWidth){
+    const chart = state.charts[chartId];
+    const w = maxWidth || 460;
+    if (!chart || !chart.canvas || !chart.canvas.width) return { width: w, height: Math.round(w * 0.5) };
+    const ratio = chart.canvas.height / chart.canvas.width;
+    return { width: w, height: Math.round(w * ratio) };
+  }
 
-    const totalRondas = ro.reduce((s,r)=>s+(Number(r.Total_Geral_Rondas)||0),0);
-    const totalKm = vi.reduce((s,r)=>s+(Number(r.KM_Rodado)||0),0);
+  async function fetchImageBytes(url){
+    try{
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const buf = await res.arrayBuffer();
+      return new Uint8Array(buf);
+    }catch(e){ return null; }
+  }
 
-    pdf.autoTable({
-      startY: 90,
-      head: [['Indicador','Valor']],
-      body: [
-        ['Ocorrências Registradas', fmtInt(oc.length)],
-        ['Rondas Preventivas', fmtInt(totalRondas)],
-        ['KM Rodado', fmtInt(totalKm)],
-        ['Apreensões', fmtInt(ap.length)]
-      ],
-      headStyles: { fillColor: [11,35,66] },
-      styles: { fontSize: 10 }
+  function docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, text, widthPct){
+    return new TableCell({
+      width: { size: widthPct, type: WidthType.PERCENTAGE },
+      shading: { fill: '0B2342', type: ShadingType.CLEAR, color: 'auto' },
+      margins: { top: 80, bottom: 80, left: 100, right: 100 },
+      children: [ new Paragraph({ children: [ new TextRun({ text, bold: true, color: 'FFFFFF', size: 18 }) ] }) ]
     });
+  }
 
-    const natMap = sortDesc(groupCount(oc, 'Natureza')).slice(0,10);
-    pdf.autoTable({
-      startY: pdf.lastAutoTable.finalY + 20,
-      head: [['Natureza (Top 10)','Ocorrências']],
-      body: natMap.map(e => [e[0], fmtInt(e[1])]),
-      headStyles: { fillColor: [21,101,192] },
-      styles: { fontSize: 10 }
+  function docxCell(TableCell, Paragraph, TextRun, WidthType, text, widthPct, opts){
+    opts = opts || {};
+    return new TableCell({
+      width: { size: widthPct, type: WidthType.PERCENTAGE },
+      margins: { top: 70, bottom: 70, left: 100, right: 100 },
+      children: [ new Paragraph({ children: [ new TextRun({ text: String(text == null ? '—' : text), bold: !!opts.bold, size: 18 }) ] }) ]
     });
+  }
 
-    const bMap = sortDesc(groupCount(oc, 'Bairro')).slice(0,10);
-    pdf.autoTable({
-      startY: pdf.lastAutoTable.finalY + 20,
-      head: [['Bairro (Top 10)','Ocorrências']],
-      body: bMap.map(e => [e[0], fmtInt(e[1])]),
-      headStyles: { fillColor: [21,101,192] },
-      styles: { fontSize: 10 }
-    });
+  async function exportExecutiveReportDocx(){
+    if (typeof docx === 'undefined'){
+      toast('A biblioteca de geração de Word (docx) ainda não carregou. Verifique a conexão e recarregue a página.', 'danger');
+      return;
+    }
+    toast('Gerando relatório executivo em Word, aguarde…', 'primary');
 
-    pdf.save(`gcm_relatorio_executivo_${Date.now()}.pdf`);
+    try{
+      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun,
+              HeadingLevel, AlignmentType, WidthType, ShadingType, BorderStyle } = docx;
+
+      const thinBorder = { style: BorderStyle.SINGLE, size: 2, color: 'D0D7E2' };
+      const tableBorders = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder, insideHorizontal: thinBorder, insideVertical: thinBorder };
+
+      const oc = filtered('ocorrencias');
+      const ro = filtered('rondas');
+      const vi = filtered('viaturas');
+      const ap = filtered('apreensoes').filter(r => String(r.Materiais_Apreendidos||'').trim() !== '');
+
+      const totalRondas = ro.reduce((s,r) => s + (Number(r.Total_Geral_Rondas)||0), 0);
+      const totalKm = vi.reduce((s,r) => s + (Number(r.KM_Rodado)||0), 0);
+
+      // ---- Brasão (imagem no cabeçalho) ----
+      const brasaoBytes = await fetchImageBytes('brasao.png');
+
+      // ---- Gráficos como imagem (fundo branco) ----
+      const chartImgs = {};
+      ['chartNatureza','chartCodigo','chartBairroDonut'].forEach(id => {
+        if (state.charts[id]) chartImgs[id] = dataUrlToUint8Array(chartToWhitePng(state.charts[id]));
+      });
+
+      const docChildren = [];
+
+      // ---- Cabeçalho com brasão ----
+      if (brasaoBytes){
+        docChildren.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [ new ImageRun({ type: 'png', data: brasaoBytes, transformation: { width: 80, height: 80 } }) ]
+        }));
+      }
+      docChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        heading: HeadingLevel.HEADING_1,
+        children: [ new TextRun({ text: 'GUARDA CIVIL MUNICIPAL DE MATÃO', bold: true, color: '0B2342' }) ]
+      }));
+      docChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [ new TextRun({ text: 'Relatório Executivo — Painel de Inteligência Operacional', italics: true, color: '475467', size: 22 }) ]
+      }));
+      docChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 300 },
+        children: [ new TextRun({ text: `Gerado em ${new Date().toLocaleString('pt-BR')}`, color: '64748B', size: 18 }) ]
+      }));
+
+      // ---- Indicadores gerais ----
+      docChildren.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 120 },
+        children: [ new TextRun({ text: 'Indicadores Gerais', bold: true, color: '0B2342' }) ] }));
+
+      const kpiRows = [
+        new TableRow({ children: [
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Indicador', 60),
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Valor', 40)
+        ]}),
+        ...[
+          ['Ocorrências Registradas', fmtInt(oc.length)],
+          ['Rondas Preventivas', fmtInt(totalRondas)],
+          ['KM Rodado', fmtInt(totalKm)],
+          ['Apreensões', fmtInt(ap.length)]
+        ].map(([a,b]) => new TableRow({ children: [
+          docxCell(TableCell, Paragraph, TextRun, WidthType, a, 60, { bold:true }),
+          docxCell(TableCell, Paragraph, TextRun, WidthType, b, 40)
+        ]}))
+      ];
+      docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: tableBorders, rows: kpiRows }));
+
+      // ---- Gráfico: Natureza ----
+      if (chartImgs.chartNatureza){
+        docChildren.push(new Paragraph({ spacing: { before: 260 }, children: [] }));
+        docChildren.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [ new ImageRun({ type:'png', data: chartImgs.chartNatureza, transformation: chartDocxSize('chartNatureza', 460) }) ]
+        }));
+      }
+
+      // ---- Natureza por categoria (3 colunas: categoria / quantidade / descrição breve) ----
+      docChildren.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 120 },
+        children: [ new TextRun({ text: 'Ocorrências por Categoria (Código do Catálogo)', bold: true, color: '0B2342' }) ] }));
+      docChildren.push(new Paragraph({ spacing: { after: 120 },
+        children: [ new TextRun({ text: 'Categorias definidas pela letra inicial do Código do Catálogo de cada ocorrência.', italics: true, color: '64748B', size: 18 }) ] }));
+
+      const catGroups = {};
+      oc.forEach(r => {
+        const cat = categoriaDoCodigo(r.Codigo_Catalogo);
+        if (!catGroups[cat.label]) catGroups[cat.label] = [];
+        catGroups[cat.label].push(r);
+      });
+      const catEntries = Object.entries(catGroups).sort((a,b) => b[1].length - a[1].length);
+
+      const catRows = [
+        new TableRow({ children: [
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Natureza (Categoria)', 40),
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Quantidade', 15),
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'O que mais houve na categoria', 45)
+        ]}),
+        ...catEntries.map(([label, rows]) => {
+          const nMap = sortDesc(groupCount(rows, 'Natureza'));
+          const top = nMap[0];
+          const desc = top
+            ? `Predominância de "${top[0]}" — ${fmtInt(top[1])} de ${fmtInt(rows.length)} ocorrências (${((top[1]/rows.length)*100).toFixed(0)}%)`
+            : '—';
+          return new TableRow({ children: [
+            docxCell(TableCell, Paragraph, TextRun, WidthType, label, 40, { bold:true }),
+            docxCell(TableCell, Paragraph, TextRun, WidthType, fmtInt(rows.length), 15),
+            docxCell(TableCell, Paragraph, TextRun, WidthType, desc, 45)
+          ]});
+        })
+      ];
+      docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: tableBorders, rows: catRows }));
+
+      if (chartImgs.chartCodigo){
+        docChildren.push(new Paragraph({ spacing: { before: 260 }, children: [] }));
+        docChildren.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [ new ImageRun({ type:'png', data: chartImgs.chartCodigo, transformation: chartDocxSize('chartCodigo', 460) }) ]
+        }));
+      }
+
+      // ---- Distribuição por Bairro (Top 10) ----
+      docChildren.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 120 },
+        children: [ new TextRun({ text: 'Distribuição por Bairro (Top 10)', bold: true, color: '0B2342' }) ] }));
+      const bMap = sortDesc(groupCount(oc, 'Bairro')).slice(0, 10);
+      const bTotal = oc.length || 1;
+      const bairroRows = [
+        new TableRow({ children: [
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Bairro', 55),
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Ocorrências', 20),
+          docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, '% do total', 25)
+        ]}),
+        ...bMap.map(([nome, qtd]) => new TableRow({ children: [
+          docxCell(TableCell, Paragraph, TextRun, WidthType, nome, 55, { bold:true }),
+          docxCell(TableCell, Paragraph, TextRun, WidthType, fmtInt(qtd), 20),
+          docxCell(TableCell, Paragraph, TextRun, WidthType, ((qtd/bTotal)*100).toFixed(1).replace('.',',') + '%', 25)
+        ]}))
+      ];
+      docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: tableBorders, rows: bairroRows }));
+
+      if (chartImgs.chartBairroDonut){
+        docChildren.push(new Paragraph({ spacing: { before: 260 }, children: [] }));
+        docChildren.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [ new ImageRun({ type:'png', data: chartImgs.chartBairroDonut, transformation: chartDocxSize('chartBairroDonut', 320) }) ]
+        }));
+      }
+
+      // ---- Materiais Apreendidos ----
+      docChildren.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 120 },
+        children: [ new TextRun({ text: 'Materiais Apreendidos', bold: true, color: '0B2342' }) ] }));
+
+      if (!ap.length){
+        docChildren.push(new Paragraph({ children: [ new TextRun({ text: 'Nenhuma apreensão registrada no período filtrado.', italics: true, color: '64748B' }) ] }));
+      } else {
+        const apRows = [
+          new TableRow({ children: [
+            docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Data', 15),
+            docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Equipe', 15),
+            docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'N° AO', 15),
+            docxHeaderCell(TableCell, Paragraph, TextRun, WidthType, ShadingType, 'Descrição dos materiais apreendidos', 55)
+          ]}),
+          ...ap.map(r => new TableRow({ children: [
+            docxCell(TableCell, Paragraph, TextRun, WidthType, r._date ? new Date(r._date).toLocaleDateString('pt-BR') : '—', 15),
+            docxCell(TableCell, Paragraph, TextRun, WidthType, r.Equipe, 15),
+            docxCell(TableCell, Paragraph, TextRun, WidthType, r.N_AO, 15),
+            docxCell(TableCell, Paragraph, TextRun, WidthType, r.Materiais_Apreendidos, 55)
+          ]}))
+        ];
+        docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: tableBorders, rows: apRows }));
+      }
+
+      const wordDoc = new Document({
+        sections: [{ properties: {}, children: docChildren }]
+      });
+
+      const blob = await Packer.toBlob(wordDoc);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `gcm_relatorio_executivo_${Date.now()}.docx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast('Relatório executivo (Word) gerado com sucesso.', 'success');
+    }catch(err){
+      console.error(err);
+      toast('Falha ao gerar o relatório executivo em Word: ' + (err && err.message || err), 'danger');
+    }
   }
 
   /* ---------------------------------------------------------------------
@@ -1102,7 +1372,7 @@
 
   function wireExportEvents(){
     $('#expDashPdf').addEventListener('click', e => { e.preventDefault(); exportDashboardPdf(); });
-    $('#expExecPdf').addEventListener('click', e => { e.preventDefault(); exportExecutiveReportPdf(); });
+    $('#expExecDocx').addEventListener('click', e => { e.preventDefault(); exportExecutiveReportDocx(); });
     $('#expExcel').addEventListener('click', e => { e.preventDefault(); exportExcel(); });
     $('#expCsv').addEventListener('click', e => { e.preventDefault(); exportCsv(); });
     $('#expGraficosPng').addEventListener('click', e => { e.preventDefault(); exportChartsPng(); });
@@ -1134,6 +1404,7 @@
       wireImportEvents();
       wireExportEvents();
       wireGerenciarEvents();
+      wireChartDownloadButtons();
       startClock();
       rebuildFilterOptions();
       updateArquivosBadge();
