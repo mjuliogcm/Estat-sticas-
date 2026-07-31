@@ -1127,6 +1127,12 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    // script.js agora é carregado dinamicamente após as bibliotecas externas,
+    // então o DOMContentLoaded pode já ter disparado antes dele existir.
+    init();
+  }
 })();
 
