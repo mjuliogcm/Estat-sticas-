@@ -301,10 +301,17 @@
       }
     }
 
-    persist();
-    rebuildFilterOptions();
-    renderAll();
-    updateArquivosBadge();
+    try{
+      persist();
+      rebuildFilterOptions();
+      renderAll();
+      updateArquivosBadge();
+    }catch(err){
+      reportError('Ao atualizar o painel — ' + (err && err.message || err));
+      $('#statusImportacao').innerHTML = `<span class="status-erro"><i class="bi bi-x-circle-fill"></i> Planilha(s) importada(s), mas houve um erro ao montar o painel. Veja a mensagem no topo da página.</span>`;
+      $('#btnConcluirImportacao').classList.remove('d-none');
+      return;
+    }
 
     if (sucesso && !falha){
       $('#statusImportacao').innerHTML = `<span class="status-ok"><i class="bi bi-check-circle-fill"></i> ${sucesso} planilha(s) importada(s) com sucesso.</span>`;
@@ -458,6 +465,17 @@
   /* ---------------------------------------------------------------------
      7. RENDERIZAÇÃO PRINCIPAL
   --------------------------------------------------------------------- */
+  function reportError(msg){
+    console.error(msg);
+    try{
+      const el = document.getElementById('avisoErroJs');
+      if (el){
+        el.textContent = '⚠ Erro no painel: ' + msg + '\n\nTire um print desta mensagem e envie para o suporte.';
+        el.classList.remove('d-none');
+      }
+    }catch(e){ /* ignora */ }
+  }
+
   function renderAll(){
     const hasData = state.files.length > 0;
     $('#emptyState').classList.toggle('d-none', hasData);
@@ -470,10 +488,11 @@
     const vi = filtered('viaturas');
     const ap = filtered('apreensoes').filter(r => String(r.Materiais_Apreendidos||'').trim() !== '');
 
-    renderKpis(oc, ro, vi, ap);
-    renderCharts(oc, ro, vi, ap);
-    renderIntel(oc, ro, vi, ap);
-    renderTable(oc);
+    // Cada seção roda isolada: se uma falhar, as outras ainda aparecem no painel.
+    try{ renderKpis(oc, ro, vi, ap); }catch(err){ reportError('KPIs — ' + (err && err.message || err)); }
+    try{ renderCharts(oc, ro, vi, ap); }catch(err){ reportError('Gráficos — ' + (err && err.message || err)); }
+    try{ renderIntel(oc, ro, vi, ap); }catch(err){ reportError('Inteligência operacional — ' + (err && err.message || err)); }
+    try{ renderTable(oc); }catch(err){ reportError('Tabela — ' + (err && err.message || err)); }
   }
 
   function renderKpis(oc, ro, vi, ap){

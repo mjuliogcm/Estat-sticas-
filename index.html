@@ -73,6 +73,27 @@
   <i class="bi bi-exclamation-triangle-fill"></i>
   Algumas bibliotecas necessárias não carregaram corretamente (verifique sua conexão com a internet). Recarregue a página; se o problema persistir, o acesso a <code>cdnjs.cloudflare.com</code> pode estar bloqueado nesta rede.
 </div>
+<div id="avisoErroJs" class="alert alert-danger rounded-0 mb-0 d-none py-2 px-3" style="font-family: monospace; font-size:.8rem; white-space:pre-wrap; text-align:left;"></div>
+
+<script>
+  // Mostra qualquer erro de JavaScript diretamente na tela (não só no console),
+  // para facilitar o diagnóstico sem precisar abrir o DevTools do navegador.
+  (function(){
+    function mostrarErro(msg){
+      var el = document.getElementById('avisoErroJs');
+      if (!el) return;
+      el.textContent = '⚠ Erro no painel: ' + msg + '\n\nTire um print desta mensagem e envie para o suporte.';
+      el.classList.remove('d-none');
+    }
+    window.addEventListener('error', function(e){
+      mostrarErro((e.message || 'erro desconhecido') + (e.filename ? ' — ' + e.filename + ':' + e.lineno : ''));
+    });
+    window.addEventListener('unhandledrejection', function(e){
+      var reason = e.reason;
+      mostrarErro('Promise rejeitada — ' + (reason && reason.message ? reason.message : JSON.stringify(reason)));
+    });
+  })();
+</script>
 
 <!-- ============ FILTER BAR ============ -->
 <div class="gcm-filterbar" id="filterBar">
