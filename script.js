@@ -392,9 +392,10 @@
 
   function rebuildFilterOptions(){
     const bairros = new Set(), naturezas = new Set(), viaturas = new Set(), mesesSet = new Set();
-    allRows('ocorrencias').forEach(r => { if (r.Bairro) bairros.add(r.Bairro); if (r.Natureza) naturezas.add(r.Natureza); if (r._month) mesesSet.add(r._month); });
-    [...allRows('rondas'), ...allRows('viaturas')].forEach(r => { if (r.Viatura) viaturas.add(r.Viatura); if (r._month) mesesSet.add(r._month); });
-    allRows('apreensoes').forEach(r => { if (r._month) mesesSet.add(r._month); });
+    const addVal = (set, v) => { const s = String(v == null ? '' : v).trim(); if (s) set.add(s); };
+    allRows('ocorrencias').forEach(r => { addVal(bairros, r.Bairro); addVal(naturezas, r.Natureza); addVal(mesesSet, r._month); });
+    [...allRows('rondas'), ...allRows('viaturas')].forEach(r => { addVal(viaturas, r.Viatura); addVal(mesesSet, r._month); });
+    allRows('apreensoes').forEach(r => { addVal(mesesSet, r._month); });
 
     fillSelect('#fBairro', bairros);
     fillSelect('#fNatureza', naturezas);
@@ -405,13 +406,13 @@
   function fillSelect(sel, values){
     const el = $(sel);
     const current = el.value;
-    const sorted = Array.from(values).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const sorted = Array.from(values).map(v => String(v)).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     el.innerHTML = `<option value="Todos">Todos</option>` + sorted.map(v => `<option value="${v}">${v}</option>`).join('');
     if (sorted.includes(current)) el.value = current;
   }
 
   function buildMesesMenu(mesesSet){
-    const ordered = MESES_PT.flatMap(m => Array.from(mesesSet).filter(v => v.startsWith(m + '/'))).sort();
+    const ordered = MESES_PT.flatMap(m => Array.from(mesesSet).map(v => String(v)).filter(v => v.startsWith(m + '/'))).sort();
     const uniqueOrdered = Array.from(new Set(ordered));
     const list = $('#fMesesList');
     list.innerHTML = `
