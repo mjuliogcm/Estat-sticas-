@@ -422,6 +422,16 @@
     return allRows(kind).filter(passesFilters);
   }
 
+  // Descrição textual do período em uso (para o cabeçalho/introdução do relatório executivo)
+  function periodoLabel(){
+    const meses = state.filters.meses;
+    if (!meses || meses.includes('Todos') || !meses.length) return 'todo o período disponível nos dados importados';
+    const ordered = MESES_PT.flatMap(m => meses.filter(v => String(v).startsWith(m + '/'))).filter((v,i,a)=>a.indexOf(v)===i);
+    if (ordered.length === 1) return ordered[0];
+    if (ordered.length === 2) return `${ordered[0]} e ${ordered[1]}`;
+    return `${ordered.slice(0,-1).join(', ')} e ${ordered[ordered.length-1]}`;
+  }
+
   function rebuildFilterOptions(){
     const bairros = new Set(), naturezas = new Set(), viaturas = new Set(), mesesSet = new Set();
     const addVal = (set, v) => { const s = String(v == null ? '' : v).trim(); if (s) set.add(s); };
@@ -572,6 +582,7 @@
     id: 'barValueLabel',
     afterDatasetsDraw(chart){
       const { ctx } = chart;
+      const suffix = (chart.options.plugins && chart.options.plugins.barValueLabel && chart.options.plugins.barValueLabel.suffix) || '';
       chart.data.datasets.forEach((ds, di) => {
         const meta = chart.getDatasetMeta(di);
         meta.data.forEach((bar, i) => {
@@ -582,14 +593,51 @@
           ctx.fillStyle = '#0B2342';
           if (chart.config.type === 'bar' && chart.options.indexAxis === 'y'){
             ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-            ctx.fillText(fmtInt(val), bar.x + 6, bar.y);
+            ctx.fillText(fmtInt(val) + suffix, bar.x + 6, bar.y);
           } else {
             ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-            ctx.fillText(fmtInt(val), bar.x, bar.y - 4);
+            ctx.fillText(fmtInt(val) + suffix, bar.x, bar.y - 4);
           }
           ctx.restore();
         });
       });
+    }
+  };
+
+  // Gradiente horizontal (esquerda→direita) usado nas barras dos rankings modernos.
+  // Recalcula a cada draw porque a chartArea só existe depois do primeiro layout.
+  function hGradient(ctx, chartArea, colorStart, colorEnd){
+    if (!chartArea) return colorEnd;
+    const g = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+    g.addColorStop(0, colorStart);
+    g.addColorStop(1, colorEnd);
+    return g;
+  }
+
+  // Linha vertical tracejada marcando a média + rótulo, para leitura rápida
+  // de quem está acima/abaixo da média no ranking (KM por Viatura / Rondas por Equipe).
+  const avgLinePlugin = {
+    id: 'avgLine',
+    afterDraw(chart){
+      const cfg = chart.options.plugins && chart.options.plugins.avgLine;
+      if (!cfg || !cfg.value) return;
+      const { ctx, chartArea, scales } = chart;
+      const xScale = scales.x;
+      const xPos = xScale.getPixelForValue(cfg.value);
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = '#B3261E';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(xPos, chartArea.top);
+      ctx.lineTo(xPos, chartArea.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = '700 10px Inter, sans-serif';
+      ctx.fillStyle = '#B3261E';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(cfg.label || 'Média', xPos, chartArea.top - 2);
+      ctx.restore();
     }
   };
 
@@ -672,25 +720,65 @@
         scales:{ x:{ grace:'15%', grid:{color:'#EEF1F5'} }, y:{ grid:{display:false} } } }
     });
 
-    // 6. Rondas por Equipe
+    // 6. Rondas por Equipe — ranking horizontal, maior valor no topo, gradiente e média
     const roEquipeMap = groupSum(ro, 'Equipe', 'Total_Geral_Rondas');
-    const roEqEntries = sortDesc(roEquipeMap);
+    const roEqEntries = sortDesc(roEquipeMap); // já desc; para barra horizontal "no topo" invertemos ao desenhar
+    const roEqLabels = roEqEntries.map(e=>e[0]).reverse();
+    const roEqData = roEqEntries.map(e=>e[1]).reverse();
+    const roEqAvg = roEqData.length ? roEqData.reduce((s,v)=>s+v,0) / roEqData.length : 0;
+    const roEqMaxIdx = roEqData.indexOf(Math.max(...roEqData));
     upsertChart('chartRondasEquipe', {
       type: 'bar',
-      data: { labels: roEqEntries.map(e=>e[0]), datasets: [{ data: roEqEntries.map(e=>e[1]),
-        backgroundColor: roEqEntries.map(e => EQUIPE_COLORS[e[0]] || '#64748B'), borderRadius:6 }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'} }, x:{ grid:{display:false} } } }
+      data: { labels: roEqLabels, datasets: [{
+        data: roEqData,
+        backgroundColor: (c) => {
+          if (c.dataIndex === roEqMaxIdx) return hGradient(c.chart.ctx, c.chart.chartArea, '#D9A400', '#F2C744');
+          return hGradient(c.chart.ctx, c.chart.chartArea, '#0B2342', '#4C8DDA');
+        },
+        borderRadius: 8, borderSkipped: false, barPercentage: 0.62, categoryPercentage: 0.8
+      }] },
+      options: {
+        indexAxis: 'y', responsive:true, maintainAspectRatio:false,
+        layout: { padding: { top: 18, right: 34 } },
+        plugins: {
+          legend:{display:false},
+          avgLine: { value: roEqAvg, label: `Média: ${fmtInt(Math.round(roEqAvg))}` },
+          barValueLabel: {},
+          tooltip:{ callbacks:{ label: c => `${fmtInt(c.raw)} rondas${c.dataIndex===roEqMaxIdx?' · maior volume':''}` } }
+        },
+        scales:{ x:{ grace:'20%', grid:{color:'#EEF1F5'}, beginAtZero:true }, y:{ grid:{display:false}, ticks:{ font:{ weight:600, size:11 } } } }
+      },
+      plugins: [barValueLabel, avgLinePlugin]
     });
 
-    // 7. KM Rodado por Viatura
+    // 7. KM Rodado por Viatura — mesmo estilo, com sufixo "km" no rótulo
     const kmViaturaMap = sortDesc(groupSum(vi, 'Viatura', 'KM_Rodado'));
+    const kmLabels = kmViaturaMap.map(e=>e[0]).reverse();
+    const kmData = kmViaturaMap.map(e=>Math.round(e[1])).reverse();
+    const kmAvg = kmData.length ? kmData.reduce((s,v)=>s+v,0) / kmData.length : 0;
+    const kmMaxIdx = kmData.indexOf(Math.max(...kmData));
     upsertChart('chartKmViatura', {
       type: 'bar',
-      data: { labels: kmViaturaMap.map(e=>e[0]), datasets: [{ data: kmViaturaMap.map(e=>Math.round(e[1])), backgroundColor:'#8A5A00', borderRadius:4 }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false},
-        tooltip:{ callbacks:{ label: c => `${fmtInt(c.raw)} km` } } },
-        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'} }, x:{ grid:{display:false} } } }
+      data: { labels: kmLabels, datasets: [{
+        data: kmData,
+        backgroundColor: (c) => {
+          if (c.dataIndex === kmMaxIdx) return hGradient(c.chart.ctx, c.chart.chartArea, '#8A5A00', '#D99A2B');
+          return hGradient(c.chart.ctx, c.chart.chartArea, '#123058', '#1565C0');
+        },
+        borderRadius: 8, borderSkipped: false, barPercentage: 0.62, categoryPercentage: 0.8
+      }] },
+      options: {
+        indexAxis: 'y', responsive:true, maintainAspectRatio:false,
+        layout: { padding: { top: 18, right: 46 } },
+        plugins: {
+          legend:{display:false},
+          avgLine: { value: kmAvg, label: `Média: ${fmtInt(Math.round(kmAvg))} km` },
+          barValueLabel: { suffix: ' km' },
+          tooltip:{ callbacks:{ label: c => `${fmtInt(c.raw)} km${c.dataIndex===kmMaxIdx?' · maior rodagem':''}` } }
+        },
+        scales:{ x:{ grace:'20%', grid:{color:'#EEF1F5'}, beginAtZero:true }, y:{ grid:{display:false}, ticks:{ font:{ weight:600, size:11 } } } }
+      },
+      plugins: [barValueLabel, avgLinePlugin]
     });
 
     // 8. Evolução mensal das Ocorrências
@@ -1141,9 +1229,23 @@
       }));
       docChildren.push(new Paragraph({
         alignment: AlignmentType.CENTER,
+        spacing: { after: 60 },
+        children: [ new TextRun({ text: `Período de referência: ${periodoLabel()}`, bold: true, color: '0B2342', size: 20 }) ]
+      }));
+      docChildren.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
         spacing: { after: 300 },
         children: [ new TextRun({ text: `Gerado em ${new Date().toLocaleString('pt-BR')}`, color: '64748B', size: 18 }) ]
       }));
+
+      // ---- Introdução ----
+      docChildren.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 100, after: 120 },
+        children: [ new TextRun({ text: 'Introdução', bold: true, color: '0B2342' }) ] }));
+      docChildren.push(new Paragraph({ spacing: { after: 200 },
+        children: [ new TextRun({
+          text: `Este relatório apresenta, de forma objetiva, os indicadores operacionais da Guarda Civil Municipal de Matão referentes a ${periodoLabel()}, com base nos registros de ocorrências, rondas, viaturas e apreensões importados no painel. Os dados a seguir têm caráter quantitativo e visam subsidiar o acompanhamento gerencial e o planejamento das ações da corporação.`,
+          size: 20
+        }) ] }));
 
       // ---- Indicadores gerais ----
       docChildren.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 120 },
@@ -1268,6 +1370,34 @@
         ];
         docChildren.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: tableBorders, rows: apRows }));
       }
+
+      // ---- Análise Operacional e Conclusão (texto objetivo, gerado a partir dos dados — sem nome de responsável) ----
+      docChildren.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300, after: 120 },
+        children: [ new TextRun({ text: 'Análise Operacional e Conclusão', bold: true, color: '0B2342' }) ] }));
+
+      const topCategoria = catEntries[0];
+      const topBairro = bMap[0];
+      const roEqTop = sortDesc(groupSum(ro, 'Equipe', 'Total_Geral_Rondas'))[0];
+      const kmViaturaTop = sortDesc(groupSum(vi, 'Viatura', 'KM_Rodado'))[0];
+
+      const analisePartes = [];
+      analisePartes.push(`No período analisado foram registradas ${fmtInt(oc.length)} ocorrência(s), ${fmtInt(totalRondas)} ronda(s) e ${fmtInt(Math.round(totalKm))} km rodado(s) pelas viaturas, além de ${fmtInt(ap.length)} registro(s) de apreensão.`);
+      if (topCategoria) analisePartes.push(`A categoria com maior volume de ocorrências foi "${topCategoria[0]}", com ${fmtInt(topCategoria[1].length)} registro(s).`);
+      if (topBairro) analisePartes.push(`O bairro com maior número de ocorrências foi ${topBairro[0]}, concentrando ${fmtInt(topBairro[1])} registro(s) (${((topBairro[1]/bTotal)*100).toFixed(1).replace('.',',')}% do total).`);
+      if (roEqTop) analisePartes.push(`Em rondas, a equipe ${roEqTop[0]} apresentou o maior volume, com ${fmtInt(roEqTop[1])} ronda(s) realizadas.`);
+      if (kmViaturaTop) analisePartes.push(`Em quilometragem, a viatura ${kmViaturaTop[0]} teve a maior rodagem, totalizando ${fmtInt(Math.round(kmViaturaTop[1]))} km.`);
+
+      docChildren.push(new Paragraph({ spacing: { after: 160 },
+        children: [ new TextRun({ text: analisePartes.join(' '), size: 20 }) ] }));
+
+      docChildren.push(new Paragraph({ spacing: { after: 200 },
+        children: [ new TextRun({
+          text: 'Os indicadores apresentados devem subsidiar o planejamento estratégico da corporação, orientando a alocação de efetivo e viaturas conforme a concentração de ocorrências por categoria e região, e a manutenção do acompanhamento periódico dos volumes de rondas, quilometragem e apreensões.',
+          size: 20
+        }) ] }));
+
+      docChildren.push(new Paragraph({ spacing: { before: 100 },
+        children: [ new TextRun({ text: 'Relatório gerado automaticamente pelo Painel de Inteligência Operacional da Guarda Civil Municipal de Matão, com base nos dados importados pelo usuário.', italics: true, color: '64748B', size: 18 }) ] }));
 
       const wordDoc = new Document({
         sections: [{ properties: {}, children: docChildren }]
