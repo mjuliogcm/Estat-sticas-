@@ -65,6 +65,7 @@
       viatura: 'Todos'
     },
     charts: {},
+    kmViaturaFiltro: 'Geral',
     table: { search: '', sortField: '_date', sortDir: 'desc', page: 1, pageSize: 10 },
     tableSource: []
   };
@@ -691,26 +692,35 @@
         scales:{ x:{ grace:'15%', grid:{color:'#EEF1F5'} }, y:{ grid:{display:false} } } }
     });
 
-    // 6. Rondas por Equipe
-    const roEquipeMap = groupSum(ro, 'Equipe', 'Total_Geral_Rondas');
-    const roEqEntries = sortDesc(roEquipeMap);
+    // 6. Rondas Pré-determinadas e Locais Visitados por Equipe — bar chart agrupado
+    const roEquipes = [...new Set(ro.map(r => r.Equipe).filter(Boolean))].sort();
+    const preMap = groupSum(ro, 'Equipe', 'Pre_determinado');
+    const locMap = groupSum(ro, 'Equipe', 'Locais_Visitadas');
     upsertChart('chartRondasEquipe', {
       type: 'bar',
-      data: { labels: roEqEntries.map(e=>e[0]), datasets: [{ data: roEqEntries.map(e=>e[1]),
-        backgroundColor: roEqEntries.map(e => EQUIPE_COLORS[e[0]] || '#64748B'), borderRadius:6 }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'} }, x:{ grid:{display:false} } } }
+      data: {
+        labels: roEquipes,
+        datasets: [
+          { label: 'Rondas Pré-determinadas', data: roEquipes.map(e => Math.round(preMap[e]||0)),
+            backgroundColor: '#1565C0', borderRadius: 8, maxBarThickness: 34 },
+          { label: 'Locais Visitados', data: roEquipes.map(e => Math.round(locMap[e]||0)),
+            backgroundColor: '#0F7B47', borderRadius: 8, maxBarThickness: 34 }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ display:true, position:'bottom', labels:{ boxWidth:9, boxHeight:9, usePointStyle:true, pointStyle:'circle', font:{ size:11 }, padding:14 } },
+          tooltip:{ mode:'index', intersect:false }
+        },
+        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'}, beginAtZero:true }, x:{ grid:{display:false} } }
+      },
+      plugins: [barValueLabel]
     });
 
-    // 7. KM Rodado por Viatura
-    const kmViaturaMap = sortDesc(groupSum(vi, 'Viatura', 'KM_Rodado'));
-    upsertChart('chartKmViatura', {
-      type: 'bar',
-      data: { labels: kmViaturaMap.map(e=>e[0]), datasets: [{ data: kmViaturaMap.map(e=>Math.round(e[1])), backgroundColor:'#8A5A00', borderRadius:4 }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false},
-        tooltip:{ callbacks:{ label: c => `${fmtInt(c.raw)} km` } } },
-        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'} }, x:{ grid:{display:false} } } }
-    });
+    // 7. KM Rodado por Viatura — lista simples (sem gráfico), com filtro por equipe
+    renderKmViaturaSimples(vi);
+
 
     // 8. Evolução mensal das Ocorrências
     const ocEvMap = {};
@@ -747,7 +757,47 @@
     });
   }
 
-  /* ---------- Inteligência Operacional ---------- */
+  /* ---------- KM por Viatura — lista simples com filtro por equipe (sem gráfico) ---------- */
+  function renderKmViaturaSimples(vi){
+    const filtroEl = $('#kmViaturaFiltro');
+    const listaEl = $('#kmViaturaLista');
+    if (!filtroEl || !listaEl) return;
+
+    const equipes = [...new Set(vi.map(r => r.Equipe).filter(Boolean))].sort();
+    if (!equipes.includes(state.kmViaturaFiltro) && state.kmViaturaFiltro !== 'Geral') state.kmViaturaFiltro = 'Geral';
+
+    // Botões de filtro (Geral + uma por equipe)
+    const opcoes = ['Geral', ...equipes];
+    filtroEl.innerHTML = opcoes.map(op =>
+      `<button type="button" data-equipe="${op}" class="${op === state.kmViaturaFiltro ? 'active' : ''}">${op}</button>`
+    ).join('');
+    filtroEl.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.kmViaturaFiltro = btn.getAttribute('data-equipe');
+        renderKmViaturaSimples(filtered('viaturas'));
+      });
+    });
+
+    // Dados filtrados por equipe
+    const viFiltrado = state.kmViaturaFiltro === 'Geral' ? vi : vi.filter(r => r.Equipe === state.kmViaturaFiltro);
+    const kmMap = sortDesc(groupSum(viFiltrado, 'Viatura', 'KM_Rodado'));
+
+    if (!kmMap.length){
+      listaEl.innerHTML = `<div class="gcm-km-vazio">Nenhum registro de viatura para "${state.kmViaturaFiltro}".</div>`;
+      return;
+    }
+    const max = kmMap[0][1] || 1;
+    listaEl.innerHTML = kmMap.map(([nome, km], i) => `
+      <div class="gcm-km-item">
+        <div class="rank">${i+1}</div>
+        <div class="info">
+          <div class="nome"><span>${nome}</span><b>${fmtInt(Math.round(km))} km</b></div>
+          <div class="barra"><i style="width:${Math.max(4, (km/max)*100)}%"></i></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
   function renderIntel(oc, ro, vi, ap){
     const bairroTop = sortDesc(groupCount(oc, 'Bairro'))[0];
     const naturezaTop = sortDesc(groupCount(oc, 'Natureza'))[0];

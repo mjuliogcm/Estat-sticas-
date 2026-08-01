@@ -202,6 +202,29 @@ body{
 .gcm-chart-wrap{ position:relative; height:280px; }
 .gcm-chart-tall{ height:340px; }
 
+/* KM por Viatura — filtro por equipe + lista simples (sem gráfico) */
+.gcm-km-filtro{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.gcm-km-filtro button{
+  border:1px solid var(--line); background:#fff; color: var(--ink-soft);
+  border-radius:999px; font-size:.78rem; font-weight:600; padding:6px 14px;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.gcm-km-filtro button:hover{ background: var(--blue-pale); border-color: var(--blue-light); color: var(--blue); }
+.gcm-km-filtro button.active{ background: var(--navy); border-color: var(--navy); color:#fff; }
+.gcm-km-lista{ display:flex; flex-direction:column; gap:10px; max-height:300px; overflow:auto; padding-right:4px; }
+.gcm-km-item{ display:flex; align-items:center; gap:12px; }
+.gcm-km-item .rank{
+  width:24px; height:24px; border-radius:7px; background: var(--blue-pale); color: var(--blue);
+  font-family: var(--font-mono); font-weight:700; font-size:.72rem;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.gcm-km-item .info{ flex:1; min-width:0; }
+.gcm-km-item .nome{ font-size:.85rem; font-weight:600; color: var(--ink); display:flex; justify-content:space-between; gap:8px; }
+.gcm-km-item .nome b{ font-family: var(--font-mono); font-weight:700; color: var(--navy); white-space:nowrap; }
+.gcm-km-item .barra{ height:7px; border-radius:99px; background: var(--paper); margin-top:5px; overflow:hidden; }
+.gcm-km-item .barra i{ display:block; height:100%; border-radius:99px; background: linear-gradient(90deg, var(--blue-light), var(--blue)); }
+.gcm-km-vazio{ text-align:center; color: var(--slate); font-size:.85rem; padding:30px 0; }
+
 /* Donut de bairros + legenda lateral */
 .gcm-donut-wrap{ display:flex; align-items:center; gap:14px; }
 .gcm-donut-canvas{ position:relative; width:56%; height:100%; flex-shrink:0; }
