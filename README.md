@@ -7,7 +7,7 @@
 - `manifest.json` — permite "instalar" o painel como app (PWA) no celular/computador
 - `sw.js` — service worker: guarda em cache o app e as bibliotecas externas na primeira vez que abrir com internet, para funcionar depois **offline**
 - `icon-192.png` / `icon-512.png` — ícone do app (usado na instalação PWA)
-- `brasao.png` — brasão da Guarda Civil Municipal, usado no topo do painel e no relatório executivo em Word
+- `brasao.png` — brasão da Guarda Civil Municipal, usado no topo do painel
 
 Os 6 arquivos + os 2 ícones precisam ficar **na mesma pasta**, com esses nomes exatos.
 
@@ -19,7 +19,7 @@ Os 6 arquivos + os 2 ícones precisam ficar **na mesma pasta**, com esses nomes 
 
 ## Primeiro uso (importante)
 Na **primeira vez** que abrir o painel, é preciso estar **com internet**, para:
-- baixar Bootstrap, Chart.js, SheetJS (leitura de planilhas), jsPDF, html2canvas e docx (geração do relatório em Word) via CDN;
+- baixar Bootstrap, Chart.js, SheetJS (leitura de planilhas), jsPDF e html2canvas via CDN;
 - o service worker guardar essas bibliotecas em cache.
 
 Depois desse primeiro carregamento, o painel volta a abrir **normalmente offline** (inclusive as planilhas já importadas ficam salvas no navegador, mesmo sem internet).
@@ -39,20 +39,12 @@ Cada arquivo `.xlsx` (ou `.csv`) importado deve conter, idealmente, estas abas:
 
 O painel também tenta reconhecer variações de nome de aba/coluna automaticamente.
 
-## Relatório Executivo (Word)
-O menu "Exportar → Relatório executivo (Word)" gera um arquivo `.docx` com:
-- Brasão da GCM e cabeçalho institucional;
-- Indicadores gerais (ocorrências, rondas, KM rodado, apreensões);
-- Ocorrências por categoria — agrupadas pela **letra inicial do Código do Catálogo** (ex.: A = Oc. contra pessoa, B = Oc. contra patrimônio, etc.), com 3 colunas: categoria, quantidade e a natureza que mais apareceu em cada categoria;
-- Distribuição por bairro (Top 10);
-- Lista dos materiais apreendidos no período filtrado;
-- Os gráficos de Natureza, Código do Catálogo e Bairro embutidos como imagem.
-
 ## Gráficos
 - Cada gráfico tem um botão de download (ícone ⬇) individual no canto do card, exportando um PNG com **fundo branco**.
 - O item "Exportar → Todos os gráficos (PNG)" também exporta com fundo branco.
-- O gráfico "Ocorrências por Código do Catálogo" agora agrupa por categoria (letra inicial do código), não pelo código bruto.
-- O gráfico "Distribuição por Bairro" é um donut com o percentual de cada bairro e uma legenda ao lado (uma alternativa a um mapa de calor real, que exigiria coordenadas geográficas de cada bairro e um serviço de mapas online).
+- O gráfico "Ocorrências por Código do Catálogo" agrupa por categoria (letra inicial do código), não pelo código bruto.
+- O gráfico "Distribuição por Bairro" é um donut com o percentual de cada bairro e uma legenda ao lado.
+- O gráfico "Ocorrências por Natureza" mostra as 10 naturezas mais frequentes; as demais (baixa frequência) são somadas em uma barra cinza "Outras naturezas", para os números não ficarem espremidos quando há muitas naturezas diferentes.
 
 ## Limites
 - Até 15 planilhas carregadas ao mesmo tempo.

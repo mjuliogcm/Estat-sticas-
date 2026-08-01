@@ -56,7 +56,6 @@
       </button>
       <ul class="dropdown-menu dropdown-menu-end gcm-dropdown">
         <li><a class="dropdown-item" href="#" id="expDashPdf"><i class="bi bi-file-earmark-pdf"></i> Dashboard completo (PDF)</a></li>
-        <li><a class="dropdown-item" href="#" id="expExecDocx"><i class="bi bi-file-earmark-word"></i> Relatório executivo (Word)</a></li>
         <li><a class="dropdown-item" href="#" id="expExcel"><i class="bi bi-file-earmark-excel"></i> Dados filtrados (Excel)</a></li>
         <li><a class="dropdown-item" href="#" id="expCsv"><i class="bi bi-filetype-csv"></i> Dados filtrados (CSV)</a></li>
         <li><a class="dropdown-item" href="#" id="expGraficosPng"><i class="bi bi-images"></i> Todos os gráficos (PNG)</a></li>
@@ -253,14 +252,14 @@
             <div class="gcm-chart-title">Rondas por Equipe</div>
             <button class="gcm-chart-dl" data-chart-id="chartRondasEquipe" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
           </div>
-          <div class="gcm-chart-wrap gcm-chart-tall"><canvas id="chartRondasEquipe"></canvas></div>
+          <div class="gcm-chart-wrap"><canvas id="chartRondasEquipe"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
           <div class="gcm-chart-title-row">
             <div class="gcm-chart-title">KM Rodado por Viatura</div>
             <button class="gcm-chart-dl" data-chart-id="chartKmViatura" title="Baixar gráfico (PNG)"><i class="bi bi-download"></i></button>
           </div>
-          <div class="gcm-chart-wrap gcm-chart-tall"><canvas id="chartKmViatura"></canvas></div>
+          <div class="gcm-chart-wrap"><canvas id="chartKmViatura"></canvas></div>
         </div>
         <div class="gcm-chart-card gcm-span-6">
           <div class="gcm-chart-title-row">
@@ -430,8 +429,7 @@
     ['https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'],
     ['https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'],
     ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'],
-    ['https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'],
-    ['https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js', 'https://unpkg.com/docx@8.5.0/build/index.umd.min.js']
+    ['https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js']
   ];
 
   // Carrega cada biblioteca em sequência (mantendo a ordem original) e só então carrega script.js.
