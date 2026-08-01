@@ -183,8 +183,13 @@ body{
 
 .gcm-chart-card{
   border:1px solid var(--line); border-radius: var(--radius-sm); padding:14px 16px;
-  background:#fff;
+  background:#fff; position:relative;
 }
+.gcm-chart-note{
+  margin-top:8px; text-align:right; font-size:.72rem; color: var(--slate);
+  display:flex; align-items:center; justify-content:flex-end; gap:5px;
+}
+.gcm-chart-note i{ font-size:.8rem; color:#B08900; }
 .gcm-chart-title{
   font-size:.82rem; font-weight:600; color: var(--ink-soft);
   text-transform:uppercase; letter-spacing:.03em;

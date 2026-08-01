@@ -631,7 +631,10 @@
     });
 
     // 2. Distribuição por Bairro — Donut (proporção por bairro) + legenda com percentuais
-    const bMap = sortDesc(groupCount(oc, 'Bairro'));
+    // Ocorrências sem bairro informado não entram no gráfico; ficam contabilizadas à parte.
+    const ocComBairro = oc.filter(r => String(r.Bairro||'').trim() !== '');
+    const semBairroCount = oc.length - ocComBairro.length;
+    const bMap = sortDesc(groupCount(ocComBairro, 'Bairro'));
     const bTotal = bMap.reduce((s,e)=>s+e[1],0) || 1;
     upsertChart('chartBairroDonut', {
       type: 'doughnut',
@@ -654,6 +657,15 @@
           <span class="nome">${e[0]}</span>
           <span class="pct">${fmtInt(e[1])} · ${((e[1]/bTotal)*100).toFixed(0)}%</span>
         </div>`).join('');
+    }
+    const bairroNotaEl = $('#bairroSemInfo');
+    if (bairroNotaEl){
+      if (semBairroCount > 0){
+        bairroNotaEl.innerHTML = `<i class="bi bi-exclamation-triangle"></i> ${fmtInt(semBairroCount)} atendimento(s) sem bairro informado (não incluído${semBairroCount===1?'':'s'} no gráfico)`;
+        bairroNotaEl.classList.remove('d-none');
+      } else {
+        bairroNotaEl.classList.add('d-none');
+      }
     }
 
     // 3. Evolução mensal das Rondas — linha
@@ -692,28 +704,22 @@
         scales:{ x:{ grace:'15%', grid:{color:'#EEF1F5'} }, y:{ grid:{display:false} } } }
     });
 
-    // 6. Rondas Pré-determinadas e Locais Visitados por Equipe — bar chart agrupado
+    // 6. Total de Locais Visitados por Equipe — barras horizontais, uma métrica só
     const roEquipes = [...new Set(ro.map(r => r.Equipe).filter(Boolean))].sort();
-    const preMap = groupSum(ro, 'Equipe', 'Pre_determinado');
     const locMap = groupSum(ro, 'Equipe', 'Locais_Visitadas');
+    const locEntries = sortDesc(Object.fromEntries(roEquipes.map(e => [e, Math.round(locMap[e]||0)])));
     upsertChart('chartRondasEquipe', {
       type: 'bar',
       data: {
-        labels: roEquipes,
-        datasets: [
-          { label: 'Rondas Pré-determinadas', data: roEquipes.map(e => Math.round(preMap[e]||0)),
-            backgroundColor: '#1565C0', borderRadius: 8, maxBarThickness: 34 },
-          { label: 'Locais Visitados', data: roEquipes.map(e => Math.round(locMap[e]||0)),
-            backgroundColor: '#0F7B47', borderRadius: 8, maxBarThickness: 34 }
-        ]
+        labels: locEntries.map(e=>e[0]),
+        datasets: [{ data: locEntries.map(e=>e[1]),
+          backgroundColor: locEntries.map(e => EQUIPE_COLORS[e[0]] || '#64748B'), borderRadius: 8, maxBarThickness: 34 }]
       },
       options: {
-        responsive:true, maintainAspectRatio:false,
-        plugins:{
-          legend:{ display:true, position:'bottom', labels:{ boxWidth:9, boxHeight:9, usePointStyle:true, pointStyle:'circle', font:{ size:11 }, padding:14 } },
-          tooltip:{ mode:'index', intersect:false }
-        },
-        scales:{ y:{ grace:'15%', grid:{color:'#EEF1F5'}, beginAtZero:true }, x:{ grid:{display:false} } }
+        indexAxis: 'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false }, tooltip:{ callbacks:{
+          label: c => `${fmtInt(c.raw)} locais visitados` } } },
+        scales:{ x:{ grace:'20%', grid:{color:'#EEF1F5'}, beginAtZero:true }, y:{ grid:{display:false} } }
       },
       plugins: [barValueLabel]
     });
