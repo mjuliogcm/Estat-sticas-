@@ -65,6 +65,7 @@
       viatura: 'Todos'
     },
     charts: {},
+    bairroDonutLegendData: null,
     kmViaturaFiltro: 'Geral',
     table: { search: '', sortField: '_date', sortDir: 'desc', page: 1, pageSize: 10 },
     tableSource: []
@@ -672,6 +673,9 @@
           <span class="pct">${fmtInt(e[1])} · ${((e[1]/bTotal)*100).toFixed(0)}%</span>
         </div>`).join('');
     }
+    // Guarda os dados da legenda para o botão de download (o canvas do donut, sozinho,
+    // não tem nenhum texto — precisamos desenhar a legenda "por fora" na hora de exportar).
+    state.bairroDonutLegendData = { entries: bMap, total: bTotal, semBairro: semBairroCount };
     const bairroNotaEl = $('#bairroSemInfo');
     if (bairroNotaEl){
       if (semBairroCount > 0){
@@ -1068,24 +1072,124 @@
     a.click();
   }
 
-  // Gera um PNG com fundo branco a partir de um gráfico Chart.js (o canvas original é transparente)
-  function chartToWhitePng(chart){
+  // Pega o texto do título do card a que este gráfico pertence (mostrado acima do gráfico na tela)
+  function chartTitleFor(chartId){
+    const canvasEl = document.getElementById(chartId);
+    const card = canvasEl ? canvasEl.closest('.gcm-chart-card') : null;
+    const titleEl = card ? card.querySelector('.gcm-chart-title') : null;
+    return titleEl ? titleEl.textContent.trim() : '';
+  }
+
+  // Gera um PNG com fundo branco a partir de um gráfico Chart.js, com o título do card
+  // desenhado no topo da imagem (o canvas do Chart.js sozinho não tem esse texto).
+  function chartToWhitePng(chart, title){
     const src = chart.canvas;
+    const dpr = src.width / (chart.width || src.width) || 1;
+    const padTop = title ? Math.round(58 * dpr) : 0;
     const out = document.createElement('canvas');
     out.width = src.width;
-    out.height = src.height;
+    out.height = src.height + padTop;
     const ctx = out.getContext('2d');
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, out.width, out.height);
-    ctx.drawImage(src, 0, 0);
+    if (title){
+      ctx.fillStyle = '#0B2342';
+      ctx.font = `bold ${Math.round(22*dpr)}px Arial, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(title, Math.round(20*dpr), padTop/2);
+      ctx.strokeStyle = '#E3E8EF';
+      ctx.lineWidth = Math.max(1, Math.round(1.5*dpr));
+      ctx.beginPath();
+      ctx.moveTo(0, padTop - ctx.lineWidth/2);
+      ctx.lineTo(out.width, padTop - ctx.lineWidth/2);
+      ctx.stroke();
+    }
+    ctx.drawImage(src, 0, padTop);
     return out.toDataURL('image/png', 1.0);
   }
 
-  function exportSingleChartPng(chartId){
+  // Exportação específica do donut de Distribuição por Bairro: como a legenda (nomes dos
+  // bairros e percentuais) fica em HTML ao lado do gráfico — não dentro do canvas — ela
+  // precisa ser redesenhada manualmente na imagem exportada, senão o PNG sai "mudo".
+  function donutBairroToWhitePng(chart, title){
+    const src = chart.canvas;
+    const dpr = src.width / (chart.width || src.width) || 1;
+    const data = state.bairroDonutLegendData || { entries: [], total: 0, semBairro: 0 };
+    const padTop = Math.round(58 * dpr);
+    const legendW = Math.round(300 * dpr);
+    const rowH = Math.round(26 * dpr);
+    const padBottom = data.semBairro ? Math.round(34 * dpr) : Math.round(10 * dpr);
+    const legendH = Math.max(src.height, data.entries.length * rowH + Math.round(20*dpr));
+
+    const out = document.createElement('canvas');
+    out.width = src.width + legendW;
+    out.height = padTop + legendH + padBottom;
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, out.width, out.height);
+
+    // Título
+    ctx.fillStyle = '#0B2342';
+    ctx.font = `bold ${Math.round(22*dpr)}px Arial, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(title, Math.round(20*dpr), padTop/2);
+    ctx.strokeStyle = '#E3E8EF';
+    ctx.lineWidth = Math.max(1, Math.round(1.5*dpr));
+    ctx.beginPath();
+    ctx.moveTo(0, padTop - ctx.lineWidth/2);
+    ctx.lineTo(out.width, padTop - ctx.lineWidth/2);
+    ctx.stroke();
+
+    // Donut (centralizado verticalmente na área da legenda)
+    const donutY = padTop + Math.max(0, (legendH - src.height) / 2);
+    ctx.drawImage(src, 0, donutY);
+
+    // Legenda (cor + nome do bairro + quantidade/percentual)
+    const legendX = src.width + Math.round(24*dpr);
+    let y = padTop + Math.round(16*dpr);
+    const dotSize = Math.round(11*dpr);
+    data.entries.forEach((entry, i) => {
+      const [nome, qtd] = entry;
+      const pct = data.total ? ((qtd/data.total)*100).toFixed(0) : '0';
+      ctx.fillStyle = PALETTE[i % PALETTE.length];
+      ctx.fillRect(legendX, y, dotSize, dotSize);
+      ctx.fillStyle = '#101828';
+      ctx.font = `${Math.round(13*dpr)}px Arial, sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(nome, legendX + dotSize + Math.round(8*dpr), y + dotSize/2);
+      ctx.fillStyle = '#0B2342';
+      ctx.font = `bold ${Math.round(13*dpr)}px 'Roboto Mono', monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(`${fmtInt(qtd)} · ${pct}%`, out.width - Math.round(14*dpr), y + dotSize/2);
+      y += rowH;
+    });
+
+    // Nota de atendimentos sem bairro informado
+    if (data.semBairro){
+      ctx.fillStyle = '#64748B';
+      ctx.font = `italic ${Math.round(12*dpr)}px Arial, sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(`${fmtInt(data.semBairro)} atendimento(s) sem bairro informado (não incluído${data.semBairro===1?'':'s'} no gráfico)`,
+        Math.round(20*dpr), out.height - padBottom/2);
+    }
+
+    return out.toDataURL('image/png', 1.0);
+  }
+
+  function chartPngDataUrl(chartId){
     const chart = state.charts[chartId];
-    if (!chart){ toast('Gráfico ainda não está disponível para exportar.', 'warning'); return; }
+    if (!chart) return null;
+    const title = chartTitleFor(chartId);
+    return chartId === 'chartBairroDonut' ? donutBairroToWhitePng(chart, title) : chartToWhitePng(chart, title);
+  }
+
+  function exportSingleChartPng(chartId){
+    const dataUrl = chartPngDataUrl(chartId);
+    if (!dataUrl){ toast('Gráfico ainda não está disponível para exportar.', 'warning'); return; }
     const a = document.createElement('a');
-    a.href = chartToWhitePng(chart);
+    a.href = dataUrl;
     a.download = `gcm_${chartId}_${Date.now()}.png`;
     a.click();
   }
@@ -1095,8 +1199,10 @@
     if (!ids.length){ toast('Nenhum gráfico disponível para exportar.', 'warning'); return; }
     ids.forEach((id, i) => {
       setTimeout(() => {
+        const dataUrl = chartPngDataUrl(id);
+        if (!dataUrl) return;
         const a = document.createElement('a');
-        a.href = chartToWhitePng(state.charts[id]);
+        a.href = dataUrl;
         a.download = `gcm_${id}.png`;
         a.click();
       }, i * 250);
