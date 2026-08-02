@@ -206,6 +206,8 @@ body{
 .gcm-chart-dl:hover{ background: var(--blue-pale); color: var(--blue); border-color: var(--blue-light); }
 .gcm-chart-wrap{ position:relative; height:280px; }
 .gcm-chart-tall{ height:340px; }
+.gcm-chart-scroll{ overflow-y:auto; overflow-x:hidden; }
+.gcm-chart-inner{ position:relative; width:100%; height:100%; }
 
 /* KM por Viatura — filtro por equipe + lista simples (sem gráfico) */
 .gcm-km-filtro{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }

@@ -544,6 +544,25 @@
     rows.forEach(r => { const k = (r[field] ?? '—') || '—'; map[k] = (map[k]||0)+1; });
     return map;
   }
+  // Igual a groupCount, mas trata "Furto" e "FURTO" como a mesma natureza — mantém, como
+  // rótulo final, a grafia que aparece com mais frequência nos dados.
+  function groupCountCI(rows, field){
+    const norm = {};
+    rows.forEach(r => {
+      const raw = String(r[field] == null ? '' : r[field]).trim();
+      const key = raw ? raw.toLowerCase() : '—';
+      if (!norm[key]) norm[key] = { variantes: {}, total: 0 };
+      const label = raw || '—';
+      norm[key].variantes[label] = (norm[key].variantes[label] || 0) + 1;
+      norm[key].total += 1;
+    });
+    const out = {};
+    Object.values(norm).forEach(entry => {
+      const label = Object.entries(entry.variantes).sort((a,b) => b[1]-a[1])[0][0];
+      out[label] = entry.total;
+    });
+    return out;
+  }
   function groupSum(rows, groupField, sumField){
     const map = {};
     rows.forEach(r => { const k = (r[groupField] ?? '—') || '—'; map[k] = (map[k]||0) + (Number(r[sumField])||0); });
@@ -598,33 +617,28 @@
     const total = oc.length || 1;
 
     // 1. Ocorrências por Natureza — barras horizontais, ordenado desc.
-    // Mostra as 10 naturezas mais frequentes individualmente; o restante é agrupado em
-    // uma única barra "Outras naturezas", para as barras terem espaço suficiente e os
-    // números não ficarem espremidos/ilegíveis quando há muitas naturezas diferentes.
-    const NAT_TOP_N = 10;
-    const natMapFull = sortDesc(groupCount(oc, 'Natureza'));
-    const natTop = natMapFull.slice(0, NAT_TOP_N);
-    const natResto = natMapFull.slice(NAT_TOP_N);
-    const natMap = natResto.length
-      ? [...natTop, [`Outras naturezas (${natResto.length})`, natResto.reduce((s,e)=>s+e[1],0)]]
-      : natTop;
+    // Todas as naturezas aparecem (mesmo as com 1 ocorrência). Naturezas iguais escritas com
+    // maiúsculas/minúsculas diferentes são somadas como uma só (usa a grafia mais frequente).
+    const natMap = sortDesc(groupCountCI(oc, 'Natureza'));
     const natBarras = natMap.length;
+    // Altura dinâmica: cada barra recebe ~26px; acima de ~14 barras o card passa a rolar
+    // internamente (o card não cresce indefinidamente na página).
+    const natInner = $('#chartNaturezaInner');
+    if (natInner) natInner.style.height = Math.max(300, natBarras * 26) + 'px';
     upsertChart('chartNatureza', {
       type: 'bar',
       data: { labels: natMap.map(e=>e[0]), datasets: [{
         data: natMap.map(e=>e[1]),
-        backgroundColor: natMap.map((e,i) => i === natTop.length && natResto.length ? '#94A3B8' : '#1565C0'),
+        backgroundColor: '#1565C0',
         borderRadius: 4,
-        maxBarThickness: 28,
-        categoryPercentage: natBarras <= 6 ? 0.55 : 0.75,
+        maxBarThickness: 22,
+        categoryPercentage: 0.7,
         barPercentage: 0.85
       }] },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display:false }, tooltip: { callbacks: {
-          label: (c) => natResto.length && c.dataIndex === natTop.length
-            ? `${natResto.length} naturezas com poucas ocorrências, somando ${fmtInt(c.raw)}`
-            : `Quantidade: ${fmtInt(c.raw)} (${((c.raw/total)*100).toFixed(1)}%)` } } },
+          label: (c) => `Quantidade: ${fmtInt(c.raw)} (${((c.raw/total)*100).toFixed(1)}%)` } } },
         scales: { x: { grace: '20%', grid:{ color:'#EEF1F5'} }, y:{ grid:{ display:false }, ticks:{ font:{ size:11 } } } }
       },
       plugins: [barValueLabel]
