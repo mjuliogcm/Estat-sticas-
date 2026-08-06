@@ -85,6 +85,74 @@
       .toLowerCase().replace(/[^a-z0-9]/g,'');
   }
 
+  /* ---------------------------------------------------------------------
+     2b. NORMALIZAÇÃO DE NOMES DE BAIRRO
+     Vários bairros aparecem grafados de formas diferentes nas planilhas
+     (com/sem acento, com prefixo "Vila/Jardim/..." ou variações de "Centro").
+     Essas funções agrupam essas variações num único item nas estatísticas,
+     mantendo como rótulo de exibição a grafia mais frequente encontrada.
+  --------------------------------------------------------------------- */
+  const BAIRRO_PREFIXOS = ['VILA','JARDIM','JD','PARQUE','PQ','RESIDENCIAL','RES',
+    'CONJUNTO','CONJ','LOTEAMENTO','NUCLEO','CHACARA','DISTRITO','SETOR'];
+
+  function stripAccents(str){
+    return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  }
+
+  // Chave canônica usada para agrupar bairros equivalentes (não é exibida ao usuário).
+  function bairroKey(raw){
+    let s = stripAccents(raw).toUpperCase().trim().replace(/\s+/g,' ');
+    if (!s) return '';
+    // Qualquer variação que se refira à região central conta como "Centro"
+    if (/\bCENTRO\b/.test(s) || /\bCENTRAL\b/.test(s)) return 'CENTRO';
+    // Remove um prefixo de tipo de bairro/logradouro (ex.: "VILA FLAMBOYANT" -> "FLAMBOYANT")
+    const partes = s.split(' ');
+    if (partes.length > 1 && BAIRRO_PREFIXOS.includes(partes[0])){
+      s = partes.slice(1).join(' ');
+    }
+    return s;
+  }
+
+  // Monta o mapa chave-canônica -> rótulo de exibição (grafia mais frequente),
+  // considerando todas as ocorrências carregadas no momento.
+  function buildBairroDisplayMap(){
+    const grupos = {};
+    allRows('ocorrencias').forEach(r => {
+      const raw = String(r.Bairro == null ? '' : r.Bairro).trim();
+      if (!raw) return;
+      const key = bairroKey(raw);
+      if (!key) return;
+      if (!grupos[key]) grupos[key] = {};
+      grupos[key][raw] = (grupos[key][raw] || 0) + 1;
+    });
+    const map = {};
+    Object.entries(grupos).forEach(([key, variantes]) => {
+      const label = Object.entries(variantes)
+        .sort((a,b) => b[1]-a[1] || a[0].length-b[0].length)[0][0];
+      map[key] = label;
+    });
+    state.bairroDisplayMap = map;
+  }
+
+  // Retorna o rótulo canônico de exibição para um valor de bairro bruto.
+  function bairroDisplay(raw){
+    const trimmed = String(raw == null ? '' : raw).trim();
+    if (!trimmed) return '';
+    const key = bairroKey(trimmed);
+    return (state.bairroDisplayMap && state.bairroDisplayMap[key]) || trimmed;
+  }
+
+  // Igual a groupCount(rows, 'Bairro'), mas agrupando variações equivalentes de bairro.
+  function groupCountBairro(rows){
+    const map = {};
+    rows.forEach(r => {
+      const raw = String(r.Bairro == null ? '' : r.Bairro).trim();
+      const label = raw ? bairroDisplay(raw) : '—';
+      map[label] = (map[label] || 0) + 1;
+    });
+    return map;
+  }
+
   // Mapeia variações de cabeçalho para o nome canônico do campo
   const FIELD_ALIASES = {
     data: 'Data',
@@ -414,7 +482,7 @@
     if (!f.meses.includes('Todos') && row._month && !f.meses.includes(row._month)) return false;
     if (f.dataIni && row._dateKey && row._dateKey < f.dataIni) return false;
     if (f.dataFim && row._dateKey && row._dateKey > f.dataFim) return false;
-    if (f.bairro !== 'Todos' && 'Bairro' in row && row.Bairro !== f.bairro) return false;
+    if (f.bairro !== 'Todos' && 'Bairro' in row && bairroDisplay(row.Bairro) !== f.bairro) return false;
     if (f.natureza !== 'Todos' && 'Natureza' in row && row.Natureza !== f.natureza) return false;
     if (f.viatura !== 'Todos' && 'Viatura' in row && row.Viatura !== f.viatura) return false;
     return true;
@@ -425,9 +493,10 @@
   }
 
   function rebuildFilterOptions(){
+    buildBairroDisplayMap();
     const bairros = new Set(), naturezas = new Set(), viaturas = new Set(), mesesSet = new Set();
     const addVal = (set, v) => { const s = String(v == null ? '' : v).trim(); if (s) set.add(s); };
-    allRows('ocorrencias').forEach(r => { addVal(bairros, r.Bairro); addVal(naturezas, r.Natureza); addVal(mesesSet, r._month); });
+    allRows('ocorrencias').forEach(r => { addVal(bairros, r.Bairro ? bairroDisplay(r.Bairro) : ''); addVal(naturezas, r.Natureza); addVal(mesesSet, r._month); });
     [...allRows('rondas'), ...allRows('viaturas')].forEach(r => { addVal(viaturas, r.Viatura); addVal(mesesSet, r._month); });
     allRows('apreensoes').forEach(r => { addVal(mesesSet, r._month); });
 
@@ -649,7 +718,7 @@
     // Ocorrências sem bairro informado não entram no gráfico; ficam contabilizadas à parte.
     const ocComBairro = oc.filter(r => String(r.Bairro||'').trim() !== '');
     const semBairroCount = oc.length - ocComBairro.length;
-    const bMap = sortDesc(groupCount(ocComBairro, 'Bairro'));
+    const bMap = sortDesc(groupCountBairro(ocComBairro));
     const bTotal = bMap.reduce((s,e)=>s+e[1],0) || 1;
     upsertChart('chartBairroDonut', {
       type: 'doughnut',
@@ -823,7 +892,7 @@
   }
 
   function renderIntel(oc, ro, vi, ap){
-    const bairroTop = sortDesc(groupCount(oc, 'Bairro'))[0];
+    const bairroTop = sortDesc(groupCountBairro(oc))[0];
     const naturezaTop = sortDesc(groupCount(oc, 'Natureza'))[0];
     const equipeTop = sortDesc(groupSum(ro, 'Equipe', 'Total_Geral_Rondas'))[0];
     const viaturaTop = sortDesc(groupSum(vi, 'Viatura', 'KM_Rodado'))[0];

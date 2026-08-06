@@ -5,7 +5,7 @@
    Depois do primeiro carregamento com internet, o painel abre normalmente offline.
    ========================================================================== */
 
-const CACHE_VERSION = 'gcm-painel-v3';
+const CACHE_VERSION = 'gcm-painel-v4';
 const APP_SHELL = [
   './',
   './index.html',
